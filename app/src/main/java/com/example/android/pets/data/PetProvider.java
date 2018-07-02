@@ -47,8 +47,8 @@ public class PetProvider extends ContentProvider {
         // should recognize. All paths added to the UriMatcher have a corresponding code to return
         // when a match is found.
 
-        sUriMatcher.addURI(PetContract.CONTENT_AUTHORITIY, "pets", PETS);
-        sUriMatcher.addURI(PetContract.CONTENT_AUTHORITIY, "pets/#", PET_ID);
+        sUriMatcher.addURI(PetContract.CONTENT_AUTHORITY, "pets", PETS);
+        sUriMatcher.addURI(PetContract.CONTENT_AUTHORITY, "pets/#", PET_ID);
     }
 
 
@@ -234,6 +234,14 @@ public class PetProvider extends ContentProvider {
      */
     @Override
     public String getType(Uri uri) {
-        return null;
+        final int match = sUriMatcher.match(uri);
+        switch (match) {
+            case PETS:
+                return PetEntry.CONTENT_LIST_TYPE;
+            case PET_ID:
+                return PetEntry.CONTENT_ITEM_TYPE;
+            default:
+                throw new IllegalStateException("Unknown URI " + uri + " with match " + match);
+        }
     }
 }
