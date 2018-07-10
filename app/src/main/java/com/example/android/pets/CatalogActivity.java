@@ -1,10 +1,12 @@
 package com.example.android.pets;
 
-import android.content.ContentResolver;
+import android.app.LoaderManager;
+import android.content.ContentUris;
 import android.content.ContentValues;
+import android.content.CursorLoader;
 import android.content.Intent;
+import android.content.Loader;
 import android.database.Cursor;
-import android.database.sqlite.SQLiteDatabase;
 import android.net.Uri;
 import android.os.Bundle;
 import android.support.design.widget.FloatingActionButton;
@@ -12,19 +14,19 @@ import android.support.v7.app.AppCompatActivity;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.AdapterView;
 import android.widget.ListView;
-import android.widget.TextView;
 
 import com.example.android.pets.data.PetContract.PetEntry;
-import com.example.android.pets.data.PetDbHelper;
-import com.example.android.pets.data.PetProvider;
-import com.example.android.pets.PetCursorAdapter;
 
 
 /**
  * Displays list of pets that were entered and stored in the app.
  */
-public class CatalogActivity extends AppCompatActivity {
+public class CatalogActivity extends AppCompatActivity implements LoaderManager.LoaderCallbacks<Cursor> {
+
+    private static final int PET_LOADER = 0;
+    PetCursorAdapter mCursorAdapter;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -40,30 +42,6 @@ public class CatalogActivity extends AppCompatActivity {
                 startActivity(intent);
             }
         });
-    }
-
-    @Override
-    protected void onStart() {
-        super.onStart();
-        displayDatabaseInfo();
-    }
-
-    /**
-     * Temporary helper method to display information in the onscreen TextView about the state of
-     * the pets database.
-     */
-    private void displayDatabaseInfo() {
-
-        String[] projection = {
-                PetEntry._ID,
-                PetEntry.COLUMN_PET_NAME,
-                PetEntry.COLUMN_PET_BREED,
-                PetEntry.COLUMN_PET_GENDER,
-                PetEntry.COLUMN_PET_WEIGHT
-        };
-        //Perform a query on the provider using the ContentResolver.
-        //Use the CONTENT_URI to access the pet data
-        Cursor cursor = getContentResolver().query(PetEntry.CONTENT_URI, projection, null, null, null);
 
         // Find listview to populate
         ListView listView = (ListView) findViewById(R.id.listview);
@@ -71,10 +49,27 @@ public class CatalogActivity extends AppCompatActivity {
         View emptyView = findViewById(R.id.empty_view);
         listView.setEmptyView(emptyView);
 
-        // Setup cursor adapter
-        PetCursorAdapter petCursorAdapter = new PetCursorAdapter(this, cursor);
-        listView.setAdapter(petCursorAdapter);
+        mCursorAdapter = new PetCursorAdapter(this, null);
+        listView.setAdapter(mCursorAdapter);
 
+        //Setup the item click listener
+        listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> adapterView, View view, int position, long id) {
+                Intent intent = new Intent(CatalogActivity.this, EditorActivity.class);
+                //Form the content URI that represents the specific pet that was clicked on
+                //by appending the id
+
+                Uri currentPetUri = ContentUris.withAppendedId(PetEntry.CONTENT_URI, id);
+                //Set the uri on the data field of the intent
+                intent.setData(currentPetUri);
+                //Launch the EditorActivity
+                startActivity(intent);
+            }
+        });
+
+        //Kick off the loader
+        getLoaderManager().initLoader(PET_LOADER, null, this);
     }
 
     /**
@@ -94,7 +89,6 @@ public class CatalogActivity extends AppCompatActivity {
         // into the pets database table.
         // Receive the new content URI that will allow us to access Toto's data in the future.
         Uri newUri = getContentResolver().insert(PetEntry.CONTENT_URI, values);
-        displayDatabaseInfo();
     }
 
     @Override
@@ -119,5 +113,34 @@ public class CatalogActivity extends AppCompatActivity {
                 return true;
         }
         return super.onOptionsItemSelected(item);
+    }
+
+    @Override
+    public Loader<Cursor> onCreateLoader(int id, Bundle args) {
+        // Define a projection including the columns we care about
+        String[] projection = {
+                PetEntry._ID,
+                PetEntry.COLUMN_PET_NAME,
+                PetEntry.COLUMN_PET_BREED
+        };
+
+        // This Loader will execute the ContentProvider's query method on a background thread
+        //Use the CONTENT_URI to access the pet data
+        return new CursorLoader(this, PetEntry.CONTENT_URI, projection, null, null, null);
+
+    }
+
+    @Override
+    public void onLoadFinished(Loader<Cursor> loader, Cursor data) {
+        // Update the PetCursorAdapter with this new cursor containing updated data
+        mCursorAdapter.swapCursor(data);
+
+    }
+
+    @Override
+    public void onLoaderReset(Loader<Cursor> loader) {
+        //Callball called when the data needs to be deleted
+        mCursorAdapter.swapCursor(null);
+
     }
 }
